@@ -1,0 +1,28 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+  # Create vm01 machine
+  config.vm.define "vm01" do |vm|
+    vm.vm.box = "bento/ubuntu-20.04"
+    vm.vm.hostname = "vm01"
+    vm.vm.network "private_network", ip: "10.0.0.2"
+    vm.vm.provider "virtualbox" do |vb|
+      vb.name = "vm01"
+      vb.cpus = 1
+      vb.memory = "1024"
+    end
+  end
+
+  config.hostmanager.enabled = true
+  config.hostmanager.manage_host = true
+  config.hostmanager.manage_guest = true
+
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y python-is-python3 bridge-utils git mininet tmux build-essential
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sh get-docker.sh
+  SHELL
+end

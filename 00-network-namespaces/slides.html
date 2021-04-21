@@ -1,0 +1,869 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+  <title>Linux Networking Workshop: Network Namespaces</title>
+  <style type="text/css">
+    body {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: #222;
+  font-size: 100%;
+}
+
+.slide {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0; right: 0;
+  background-color: #f7f7f7;
+}
+
+.slide-content {
+  width: 800px;
+  height: 600px;
+  overflow: hidden;
+  margin: 80px auto 0 auto;
+  padding: 30px;
+
+  font-weight: 200;
+  font-size: 200%;
+  line-height: 1.375;
+}
+
+.controls {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+}
+
+.arrow {
+  width: 0; height: 0;
+  border: 30px solid #333;
+  float: left;
+  margin-right: 30px;
+
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.prev {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+
+  border-left-width: 0;
+  border-right-width: 50px;
+}
+
+.next {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+
+  border-left-width: 50px;
+  border-right-width: 0;
+}
+
+.prev:hover {
+  border-right-color: #888;
+  cursor: pointer;
+}
+
+.next:hover {
+  border-left-color: #888;
+  cursor: pointer;
+}
+
+h1 {
+  font-size: 300%;
+  line-height: 1.2;
+  text-align: center;
+  margin: 170px 0 0;
+}
+
+h2 {
+  font-size: 100%;
+  line-height: 1.2;
+  margin: 5px 0;
+  text-align: center;
+  font-weight: 200;
+}
+
+h3 {
+  font-size: 140%;
+  line-height: 1.2;
+  border-bottom: 1px solid #aaa;
+  margin: 0;
+  padding-bottom: 15px;
+}
+
+ul {
+  padding: 20px 0 0 60px;
+  font-weight: 200;
+  line-height: 1.375;
+}
+
+.author h1 {
+  font-size: 170%;
+  font-weight: 200;
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.author h3 {
+  font-weight: 100;
+  text-align: center;
+  font-size: 95%;
+  border: none;
+}
+
+a {
+  text-decoration: none;
+  color: #44a4dd;
+}
+
+a:hover {
+  color: #66b5ff;
+}
+
+pre {
+  font-size: 60%;
+  line-height: 1.3;
+}
+
+.progress {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  z-index: 1;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 3px;
+  background-color: #b4b4b4;
+
+  -webkit-transition: width 0.05s ease-out;
+  -moz-transition: width 0.05s ease-out;
+  -o-transition: width 0.05s ease-out;
+  transition: width 0.05s ease-out;
+}
+
+.hidden {
+  display: none;
+}
+
+@media (max-width: 850px) {
+
+  body {
+    font-size: 70%;
+  }
+
+  .slide-content {
+    width: auto;
+  }
+
+  img {
+    width: 100%;
+  }
+
+  h1 {
+    margin-top: 120px;
+  }
+
+  .prev, .prev:hover {
+    border-right-color: rgba(135, 135, 135, 0.5);
+  }
+
+  .next, .next:hover {
+    border-left-color: rgba(135, 135, 135, 0.5);
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 50%;
+    overflow: hidden;
+  }
+
+  .slide-content {
+    padding: 10px;
+    margin-top: 10px;
+    height: 340px;
+  }
+
+  h1 {
+    margin-top: 50px;
+  }
+
+  ul {
+    padding-left: 25px;
+  }
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+  }
+
+  @page {
+    size: letter;
+  }
+
+  .hidden {
+    display: inline;
+  }
+
+  html {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  body {
+    margin: 0 auto !important;
+    border: 0;
+    padding: 0;
+    float: none !important;
+    overflow: visible;
+    background: none !important;
+    font-size: 52%;
+  }
+
+  .progress, .controls {
+    display: none;
+  }
+
+  .slide {
+    position: static;
+  }
+
+  .slide-content {
+    border: 1px solid #222;
+    margin-top: 0;
+    margin-bottom: 40px;
+    height: 3.5in;
+    overflow: visible;
+  }
+
+  .slide:nth-child(even) {
+    /* 2 slides per page */
+    page-break-before: always;
+  }
+}
+
+/*
+
+github.com style (c) Vasily Polovnyov <vast@whiteants.net>
+
+*/
+
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #333;
+  background: #f8f8f8;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #998;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #333;
+  font-weight: bold;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag .hljs-attr {
+  color: #008080;
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: #d14;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  color: #900;
+  font-weight: bold;
+}
+
+.hljs-subst {
+  font-weight: normal;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #458;
+  font-weight: bold;
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attribute {
+  color: #000080;
+  font-weight: normal;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #009926;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #990073;
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #0086b3;
+}
+
+.hljs-meta {
+  color: #999;
+  font-weight: bold;
+}
+
+.hljs-deletion {
+  background: #fdd;
+}
+
+.hljs-addition {
+  background: #dfd;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+
+  </style>
+</head>
+<body>
+    <div class="progress">
+    <div class="progress-bar"></div>
+  </div>
+
+  <div class="slide" id="slide-1">
+    <section class="slide-content"><h1 id="linux-networking-workshop">Linux Networking Workshop</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-2">
+    <section class="slide-content"><h1 id="network-namespaces">Network Namespaces</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-3">
+    <section class="slide-content"><h3 id="purpose">Purpose</h3>
+<p>The purpose of this workshop:</p>
+<ul>
+<li>Understanding mechanics of linux namespaces in general and network namespaces in particular</li>
+<li>What is Virtual Ethernet (<code>veth</code>) device and how to use it to establish communication between 2 different network namespaces.</li>
+</ul>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-4">
+    <section class="slide-content"><h3 id="outcomes">Outcomes</h3>
+<p>At the end of the workshop you learn:</p>
+<ul>
+<li>What Linux Namespaces are</li>
+<li>How to assign a process to a namespace</li>
+<li>Namespace lifecycle</li>
+<li>Lab: Create two network namespaces using <code>iproute2</code> and setup connectivity between them</li>
+</ul>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-5">
+    <section class="slide-content"><h3 id="namespace-types">Namespace types</h3>
+<p>The following table shows the namespace types available on Linux.</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Isolates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cgroup</code></td>
+<td>Cgroup root directory</td>
+</tr>
+<tr>
+<td><code>ipc</code></td>
+<td>System V IPC, POSIX message queues</td>
+</tr>
+<tr>
+<td><code>mnt</code></td>
+<td>Mount points</td>
+</tr>
+<tr>
+<td><code>net</code></td>
+<td>Network devices, stacks, ports, etc.</td>
+</tr>
+<tr>
+<td><code>pid</code></td>
+<td>Process IDs</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>User and group IDs</td>
+</tr>
+<tr>
+<td><code>utc</code></td>
+<td>Hostname and NIS domain name</td>
+</tr>
+</tbody>
+</table>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-6">
+    <section class="slide-content"><h3 id="how-to-assign-a-process-to-a-namespace">How to assign a process to a namespace</h3>
+<ul>
+<li><strong>clone()</strong>: Spawn a child process with a new namespace(s)</li>
+<li><strong>unshare()</strong>: Create a new namespace without creating a new process</li>
+<li><strong>setns()</strong>: Assign current process (thread) to an existing namespace</li>
+</ul>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-7">
+    <section class="slide-content"><h3 id="code-example">Code example</h3>
+<pre><code class="lang-c"><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">int</span> <span class="hljs-title">child_fn</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"new network namespace interfaces:\n"</span>);
+    system(<span class="hljs-string">"ip link"</span>);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"\n"</span>);
+    sleep(<span class="hljs-number">30</span>);
+
+    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"source network namespace interfaces:\n"</span>);
+    system(<span class="hljs-string">"ip link"</span>);
+    <span class="hljs-built_in">printf</span>(<span class="hljs-string">"\n"</span>);
+
+    <span class="hljs-keyword">pid_t</span> childPid = clone(child_fn, stackTop, CLONE_NEWNET | SIGCHLD, <span class="hljs-literal">NULL</span>);
+
+    <span class="hljs-keyword">if</span> (waitpid(childPid, <span class="hljs-literal">NULL</span>, <span class="hljs-number">0</span>) == <span class="hljs-number">-1</span>)    <span class="hljs-comment">/* Wait for child */</span>
+        errExit(<span class="hljs-string">"waitpid"</span>);
+
+    <span class="hljs-built_in">exit</span>(EXIT_SUCCESS);
+}
+</code></pre>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-8">
+    <section class="slide-content"><p>Process running:</p>
+<pre><code class="lang-bash">root@vm01:~<span class="hljs-comment"># lsns -t net</span>
+        NS TYPE NPROCS   PID USER    NETNSID NSFS COMMAND
+4026531992 net     103     1 root unassigned      /sbin/init
+4026532265 net       1 27751 root unassigned      ./a.out
+</code></pre>
+<p>Process terminated:</p>
+<pre><code class="lang-bash">root@vm01:~<span class="hljs-comment"># lsns -t net</span>
+        NS TYPE NPROCS   PID USER    NETNSID NSFS COMMAND
+4026531992 net     103     1 root unassigned      /sbin/init
+</code></pre>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-9">
+    <section class="slide-content"><h3 id="namespace-lifecycle">Namespace lifecycle</h3>
+<p>A namespace is automatically torn down when the last process in the namespace terminates or leaves the namespace.</p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-10">
+    <section class="slide-content"><h3 id="lsns">Lsns</h3>
+<p>Query all available namespaces that have running process</p>
+<pre><code class="lang-bash">vagrant@vm01:~$ sudo lsns
+        NS TYPE   NPROCS   PID USER            COMMAND
+4026531835 cgroup    100     1 root            /sbin/init
+4026531836 pid       100     1 root            /sbin/init
+4026531837 user      100     1 root            /sbin/init
+4026531838 uts        98     1 root            /sbin/init
+4026531839 ipc       100     1 root            /sbin/init
+4026531840 mnt        95     1 root            /sbin/init
+4026531860 mnt         1    15 root            kdevtmpfs
+4026531992 net       100     1 root            /sbin/init
+4026532164 mnt         1   378 root            /lib/systemd/systemd-udevd
+4026532165 uts         1   378 root            /lib/systemd/systemd-udevd
+4026532166 mnt         1  4056 systemd-network /lib/systemd/systemd-networkd
+4026532185 mnt         1   549 systemd-resolve /lib/systemd/systemd-resolved
+4026532250 mnt         1   611 root            /lib/systemd/systemd-logind
+4026532317 uts         1   611 root            /lib/systemd/systemd-logind
+</code></pre>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-11">
+    <section class="slide-content"><h3 id="namespace-information-in-proc">Namespace information in /proc</h3>
+<p>Each process has a <code>/proc/[pid]/ns/</code> subdirectory containing one entry for each namespace.</p>
+<pre><code class="lang-bash">vagrant@vm01:~$ ls -l /proc/$$/ns
+total 0
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 cgroup -&gt; <span class="hljs-string">'cgroup:[4026531835]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 ipc -&gt; <span class="hljs-string">'ipc:[4026531839]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 mnt -&gt; <span class="hljs-string">'mnt:[4026531840]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 net -&gt; <span class="hljs-string">'net:[4026531992]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 pid -&gt; <span class="hljs-string">'pid:[4026531836]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 15:17 pid_for_children -&gt; <span class="hljs-string">'pid:[4026531836]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 user -&gt; <span class="hljs-string">'user:[4026531837]'</span>
+lrwxrwxrwx 1 vagrant vagrant 0 Apr 20 14:13 uts -&gt; <span class="hljs-string">'uts:[4026531838]'</span>
+</code></pre>
+<p>Bind mounting one of the files in this directory to somewhere else in the filesystem keeps the corresponding namespace of the process specified by pid alive even if all processes currently in the namespace terminate.</p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-12">
+    <section class="slide-content"><h3 id="network-namespaces">Network namespaces</h3>
+<p>Network namespace isolates:</p>
+<ul>
+<li>Network interfaces</li>
+<li>TCP/IP stack (ports)</li>
+<li>Routing tables</li>
+<li>Iptables chains</li>
+</ul>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-13">
+    <section class="slide-content"><h3 id="veth-devices">Veth devices</h3>
+<p>The <code>veth</code> devices are virtual Ethernet devices. They can act as tunnels between network namespaces to create a bridge to a physical network device in another namespace.
+<code>veth</code> devices are always created in interconnected pairs. A pair can be created using the command:</p>
+<pre><code class="lang-bash">ip link add &lt;p1-name&gt; <span class="hljs-built_in">type</span> veth peer name &lt;p2-name&gt;
+</code></pre>
+<p>In the above, <code>p1-name</code> and <code>p2-name</code> are the names assigned to the two connected end points.</p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-14">
+    <section class="slide-content"><h1 id="lab">LAB</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-15">
+    <section class="slide-content"><h1 id="boot-a-linux-vm">Boot a linux VM</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-16">
+    <section class="slide-content"><h3 id="boot-a-linux-vm">Boot a linux VM</h3>
+<pre><code class="lang-bash">vagrant up
+</code></pre>
+<p>After system boots up we get a single network namespace, aka root namespace</p>
+</section>
+  </div>
+  <div class="slide hidden -" id="slide-17">
+    <section class="slide-content"><h3 id="boot-a-linux-vm">Boot a linux VM</h3>
+<p><img src="images/single_netns.svg" alt="Root network namespace"></p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-18">
+    <section class="slide-content"><h1 id="create-network-namespaces">Create network namespaces</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-19">
+    <section class="slide-content"><h3 id="create-network-namespaces">Create network namespaces</h3>
+<p>Add network namespaces</p>
+<pre><code class="lang-bash">ip netns add blue
+ip netns add red
+</code></pre>
+<p>What does <code>ip netns add</code> do</p>
+<pre><code>root@vm01:~# strace ip netns add blue
+
+openat(AT_FDCWD, &quot;/proc/self/ns/net&quot;, O_RDONLY|O_CLOEXEC) = 5
+unshare(CLONE_NEWNET)                   = 0
+mount(&quot;/proc/self/ns/net&quot;, &quot;/run/netns/blue&quot;, 0x55a8ed78967f, MS_BIND, NULL) = 0
+setns(5, CLONE_NEWNET)                  = 0
+</code></pre><p>List network namespaces:</p>
+<pre><code>root@vm01:~# ip netns list
+red
+blue
+</code></pre></section>
+  </div>
+  <div class="slide hidden -" id="slide-20">
+    <section class="slide-content"><h3 id="create-network-namespaces">Create network namespaces</h3>
+<p><img src="images/blue_red_empty.svg" alt="Blue and red"></p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-21">
+    <section class="slide-content"><h1 id="create-veth-pair">Create veth pair</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-22">
+    <section class="slide-content"><h3 id="create-veth-pair">Create veth pair</h3>
+<p>Add network interfaces</p>
+<pre><code class="lang-bash">ip link add veth0 <span class="hljs-built_in">type</span> veth peer name veth1
+</code></pre>
+<p>List network interfaces</p>
+<pre><code>root@vm01:~# ip link show
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 08:00:27:14:86:db brd ff:ff:ff:ff:ff:ff
+3: eth1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 08:00:27:4f:f8:b6 brd ff:ff:ff:ff:ff:ff
+4: docker0: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default
+    link/ether 02:42:d4:71:c9:bc brd ff:ff:ff:ff:ff:ff
+5: veth1@veth0: &lt;BROADCAST,MULTICAST,M-DOWN&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether ca:a0:db:91:71:80 brd ff:ff:ff:ff:ff:ff
+6: veth0@veth1: &lt;BROADCAST,MULTICAST,M-DOWN&gt; mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 52:3d:b3:73:c8:45 brd ff:ff:ff:ff:ff:ff
+</code></pre></section>
+  </div>
+  <div class="slide hidden -" id="slide-23">
+    <section class="slide-content"><h3 id="create-veth-pair">Create veth pair</h3>
+<p><img src="images/veth_created.svg" alt="Create veth pair"></p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-24">
+    <section class="slide-content"><h1 id="assign-veth-interfaces-to-namespaces">Assign veth interfaces to namespaces</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-25">
+    <section class="slide-content"><h3 id="assign-veth-interfaces-to-namespaces">Assign veth interfaces to namespaces</h3>
+<p>Assign interfaces to namespaces</p>
+<pre><code class="lang-bash">ip link <span class="hljs-built_in">set</span> dev veth0 netns blue
+ip link <span class="hljs-built_in">set</span> dev veth1 netns red
+</code></pre>
+<p>List network interfaces</p>
+<pre><code>root@vm01:~# ip link show
+1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 08:00:27:14:86:db brd ff:ff:ff:ff:ff:ff
+3: eth1: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 08:00:27:4f:f8:b6 brd ff:ff:ff:ff:ff:ff
+4: docker0: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default
+    link/ether 02:42:d4:71:c9:bc brd ff:ff:ff:ff:ff:ff
+</code></pre></section>
+  </div>
+  <div class="slide hidden" id="slide-26">
+    <section class="slide-content"><h3 id="assign-veth-interfaces-to-namespaces">Assign veth interfaces to namespaces</h3>
+<p><img src="images/veth_connected.svg" alt="Assign veth interfaces"></p>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-27">
+    <section class="slide-content"><h1 id="assign-ip-addresses">Assign IP addresses</h1>
+</section>
+  </div>
+  <div class="slide hidden" id="slide-28">
+    <section class="slide-content"><h3 id="assign-ip-addresses">Assign IP addresses</h3>
+<p>Bring interfaces up and assign addresses</p>
+<pre><code class="lang-bash">ip netns <span class="hljs-built_in">exec</span> blue ip link <span class="hljs-built_in">set</span> lo up
+ip netns <span class="hljs-built_in">exec</span> blue ip link <span class="hljs-built_in">set</span> veth0 up
+ip netns <span class="hljs-built_in">exec</span> blue ip address add 10.1.0.2/24 dev veth0
+ip netns <span class="hljs-built_in">exec</span> red ip link <span class="hljs-built_in">set</span> lo up
+ip netns <span class="hljs-built_in">exec</span> red ip link <span class="hljs-built_in">set</span> veth1 up
+ip netns <span class="hljs-built_in">exec</span> red ip address add 10.1.0.3/24 dev veth1
+</code></pre>
+<p>Check ping <code>red</code> IP from <code>blue</code> namespace</p>
+<pre><code>root@vm01:~# ip netns exec blue ping -c 5 10.1.0.3
+PING 10.1.0.3 (10.1.0.3) 56(84) bytes of data.
+64 bytes from 10.1.0.3: icmp_seq=1 ttl=64 time=0.314 ms
+64 bytes from 10.1.0.3: icmp_seq=2 ttl=64 time=0.055 ms
+64 bytes from 10.1.0.3: icmp_seq=3 ttl=64 time=0.044 ms
+64 bytes from 10.1.0.3: icmp_seq=4 ttl=64 time=0.052 ms
+64 bytes from 10.1.0.3: icmp_seq=5 ttl=64 time=0.056 ms
+</code></pre></section>
+  </div>
+  <div class="slide hidden" id="slide-29">
+    <section class="slide-content"><h3 id="assign-ip-addresses">Assign IP addresses</h3>
+<p><img src="images/netns_connected.svg" alt="Assign veth interfaces"></p>
+</section>
+  </div>
+  <div class="slide hidden -" id="slide-30">
+    <section class="slide-content"><h1 id="references">References</h1>
+</section>
+  </div>
+  <div class="slide hidden -" id="slide-31">
+    <section class="slide-content"><h3 id="references">References</h3>
+<ul>
+<li><a href="https://man7.org/linux/man-pages/man7/namespaces.7.html">https://man7.org/linux/man-pages/man7/namespaces.7.html</a></li>
+<li><a href="https://man7.org/linux/man-pages/man7/network_namespaces.7.html">https://man7.org/linux/man-pages/man7/network_namespaces.7.html</a></li>
+<li><a href="https://man7.org/linux/man-pages/man4/veth.4.html">https://man7.org/linux/man-pages/man4/veth.4.html</a></li>
+<li><a href="https://baturin.org/docs/iproute2/">https://baturin.org/docs/iproute2/</a></li>
+</ul>
+</section>
+  </div>
+  <div class="slide hidden author-slide" id="slide-32">
+    <section class="slide-content"><div class="author">
+  <h1 class="name">Anton Ustyuzhanin</h1>
+    <h3 class="twitter">
+      <a href="http://twitter.com/@antonu17">@antonu17</a>
+    </h3>
+</div>
+</section>
+  </div>
+
+  <div class="controls">
+    <div class="arrow prev"></div>
+    <div class="arrow next"></div>
+  </div>
+
+
+  <script type="text/javascript">
+    /**
+ * Returns the current page number of the presentation.
+ */
+function currentPosition() {
+  return parseInt(document.querySelector('.slide:not(.hidden)').id.slice(6));
+}
+
+
+/**
+ * Navigates forward n pages
+ * If n is negative, we will navigate in reverse
+ */
+function navigate(n) {
+  var position = currentPosition();
+  var numSlides = document.getElementsByClassName('slide').length;
+
+  /* Positions are 1-indexed, so we need to add and subtract 1 */
+  var nextPosition = (position - 1 + n) % numSlides + 1;
+
+  /* Normalize nextPosition in-case of a negative modulo result */
+  nextPosition = (nextPosition - 1 + numSlides) % numSlides + 1;
+
+  document.getElementById('slide-' + position).classList.add('hidden');
+  document.getElementById('slide-' + nextPosition).classList.remove('hidden');
+
+  updateProgress();
+  updateURL();
+  updateTabIndex();
+}
+
+
+/**
+ * Updates the current URL to include a hashtag of the current page number.
+ */
+function updateURL() {
+  try {
+    window.history.replaceState({} , null, '#' + currentPosition());
+  } catch (e) {
+    window.location.hash = currentPosition();
+  }
+}
+
+
+/**
+ * Sets the progress indicator.
+ */
+function updateProgress() {
+  var progressBar = document.querySelector('.progress-bar');
+
+  if (progressBar !== null) {
+    var numSlides = document.getElementsByClassName('slide').length;
+    var position = currentPosition() - 1;
+    var percent = (numSlides === 1) ? 100 : 100 * position / (numSlides - 1);
+    progressBar.style.width = percent.toString() + '%';
+  }
+}
+
+
+/**
+ * Removes tabindex property from all links on the current slide, sets
+ * tabindex = -1 for all links on other slides. Prevents slides from appearing
+ * out of control.
+ */
+function updateTabIndex() {
+  var allLinks = document.querySelectorAll('.slide a');
+  var position = currentPosition();
+  var currentPageLinks = document.getElementById('slide-' + position).querySelectorAll('a');
+  var i;
+
+  for (i = 0; i < allLinks.length; i++) {
+    allLinks[i].setAttribute('tabindex', -1);
+  }
+
+  for (i = 0; i < currentPageLinks.length; i++) {
+    currentPageLinks[i].removeAttribute('tabindex');
+  }
+}
+
+/**
+ * Determines whether or not we are currently in full screen mode
+ */
+function isFullScreen() {
+  return document.fullscreenElement ||
+         document.mozFullScreenElement ||
+         document.webkitFullscreenElement ||
+         document.msFullscreenElement;
+}
+
+/**
+ * Toggle fullScreen mode on document element.
+ * Works on chrome (>= 15), firefox (>= 9), ie (>= 11), opera(>= 12.1), safari (>= 5).
+ */
+function toggleFullScreen() {
+  /* Convenient renames */
+  var docElem = document.documentElement;
+  var doc = document;
+
+  docElem.requestFullscreen =
+      docElem.requestFullscreen ||
+      docElem.msRequestFullscreen ||
+      docElem.mozRequestFullScreen ||
+      docElem.webkitRequestFullscreen.bind(docElem, Element.ALLOW_KEYBOARD_INPUT);
+
+  doc.exitFullscreen =
+      doc.exitFullscreen ||
+      doc.msExitFullscreen ||
+      doc.mozCancelFullScreen ||
+      doc.webkitExitFullscreen;
+
+  isFullScreen() ? doc.exitFullscreen() : docElem.requestFullscreen();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  // Update the tabindex to prevent weird slide transitioning
+  updateTabIndex();
+
+  // If the location hash specifies a page number, go to it.
+  var page = window.location.hash.slice(1);
+  if (page) {
+    navigate(parseInt(page) - 1);
+  }
+
+  document.onkeydown = function (e) {
+    var kc = e.keyCode;
+
+    // left, down, H, J, backspace, PgUp - BACK
+    // up, right, K, L, space, PgDn - FORWARD
+    // enter - FULLSCREEN
+    if (kc === 37 || kc === 40 || kc === 8 || kc === 72 || kc === 74 || kc === 33) {
+      navigate(-1);
+    } else if (kc === 38 || kc === 39 || kc === 32 || kc === 75 || kc === 76 || kc === 34) {
+      navigate(1);
+    } else if (kc === 13) {
+      toggleFullScreen();
+    }
+  };
+
+  if (document.querySelector('.next') && document.querySelector('.prev')) {
+    document.querySelector('.next').onclick = function (e) {
+      e.preventDefault();
+      navigate(1);
+    };
+
+    document.querySelector('.prev').onclick = function (e) {
+      e.preventDefault();
+      navigate(-1);
+    };
+  }
+});
+
+
+  </script>
+</body>
+</html>
